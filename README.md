@@ -21,7 +21,7 @@ The goal is to have one outdoor MCU connected to a temperature and humidity sens
 
 The server module utilizes the SocketServer class from the [SimpleSocket library](https://github.com/17livincent/SimpleSocket).  It will run two SocketServer objects.  One will interact directly with client_sensor and the other with the client_display.  TCP will be used for each connection.
 
-The server will convert the temperature value Fahrenheit.  The values to be shown by the client_display will be sent as a string with the readable text.
+The server will convert the temperature value to Fahrenheit.  The values to be shown by the client_display will be sent as a string with the readable text.
 
 ### client_sensor
 
