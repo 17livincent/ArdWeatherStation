@@ -1,0 +1,2 @@
+add_executable(weather_server weather_server.cpp)
+target_link_libraries(weather_server server)
