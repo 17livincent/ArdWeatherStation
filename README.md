@@ -52,10 +52,10 @@ typedef struct sensor_readings_t {
 
 ### 3. server --> client_display
 
-The LCD client_display will have 16 columns and 2 rows, so the server will send the displayed string in a 32-byte array.
+The LCD client_display will have 16 columns and 2 rows, so the server will send the displayed string in a 33-byte array (+1 for the null byte).
 
 ```
-char[32] display_text;
+char[33] lcd_display_text;
 ```
 
 ### 4. client_display --> server
