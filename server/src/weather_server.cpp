@@ -50,36 +50,36 @@ void server_sensor_handler(const SocketServer* server, const uint8_t instance_id
     while(server->active && server->instance_running[instance_id]) {
         // Implement sm_sensor_comm_state
         switch(sensor_state) {
-            case SM_SENSOR_WAITING_FOR_INTERVAL:
-                // Check if INTERVAL_MEASUREMENT has been reached
-                if(sem_time_to_measure.try_acquire()) {
-                    std::cout << "SENSOR HANDLER STATE: SM_SENSOR_WAITING_FOR_INTERVAL" << std::endl;
-                    // Send MSG_MEAS_REQ
-                    server->instance_send_buffer_len[instance_id] = MSG_MEAS_REQ_LEN;
-                    instance_send_buffer[0] = MSG_MEAS_REQ;
-                    ssize_t send_size = send(socket, (void*)instance_send_buffer, server->instance_send_buffer_len[instance_id], 0);
+            case SM_SENSOR_WAITING_FOR_INTERVAL: {
+                std::cout << "SENSOR HANDLER: STATE SM_SENSOR_WAITING_FOR_INTERVAL" << std::endl;
+                usleep(INTERVAL_MEASUREMENT);
 
-                    // Check send status
-                    if(send_size == server->instance_send_buffer_len[instance_id]) {
-                        // Send was successful
-                        sensor_state = SM_SENSOR_PENDING_MES_RSP;
-                    }
-                    else {
-                        // Send was not successful
-                        // Lost connection
-                        std::cout << "SENSOR HANDLER CONNECTION CLOSED" << std::endl;
-                        server->instance_running[instance_id] = false;
-                        sensor_state = SM_SENSOR_UNKNOWN_STATE;
-                    }
+                // Send MSG_MEAS_REQ
+                server->instance_send_buffer_len[instance_id] = MSG_MEAS_REQ_LEN;
+                instance_send_buffer[0] = MSG_MEAS_REQ;
+                ssize_t send_size = send(socket, (void*)instance_send_buffer, server->instance_send_buffer_len[instance_id], 0);
 
-                    // Clear flag
-                    sem_time_to_measure.release();
+                // Check send status
+                if(send_size == server->instance_send_buffer_len[instance_id]) {
+                    // Send was successful
+                    sensor_state = SM_SENSOR_PENDING_MES_RSP;
+                }
+                else {
+                    // Send was not successful
+                    // Lost connection
+                    std::cout << "SENSOR HANDLER: CONNECTION CLOSED" << std::endl;
+                    server->instance_running[instance_id] = false;
+                    sensor_state = SM_SENSOR_UNKNOWN_STATE;
                 }
 
+                // Clear flag
+                sem_time_to_measure.release();
+
                 break;
+            }
 
             case SM_SENSOR_PENDING_MES_RSP:
-                std::cout << "SENSOR HANDLER STATE: SM_SENSOR_PENDING_MES_RSP" << std::endl;
+                std::cout << "SENSOR HANDLER: STATE SM_SENSOR_PENDING_MES_RSP" << std::endl;
                 // Wait for and read sensor reading from socket
                 server->instance_recv_buffer_len[instance_id] = ::read(socket, (void*)instance_recv_buffer, server->recv_buffer_max_len);// @TODO need timeout
 
@@ -103,7 +103,7 @@ void server_sensor_handler(const SocketServer* server, const uint8_t instance_id
                     latest_readings.temp = std::numeric_limits<float>::max();
                     latest_readings.rel_hum = std::numeric_limits<float>::max();
 
-                    std::cout << "SENSOR HANDLER CONNECTION CLOSED" << std::endl;
+                    std::cout << "SENSOR HANDLER: CONNECTION CLOSED" << std::endl;
                     server->instance_running[instance_id] = false;
                     sensor_state = SM_SENSOR_UNKNOWN_STATE;
                 }
@@ -112,7 +112,7 @@ void server_sensor_handler(const SocketServer* server, const uint8_t instance_id
 
             case SM_SENSOR_UNKNOWN_STATE:
                 // This shouldn't be reachable, as SM_SENSOR_UNKNOWN_STATE means that there is no connection
-                std::cout << "SENSOR HANDLER CONNECTION CLOSED" << std::endl;
+                std::cout << "SENSOR HANDLER: CONNECTION CLOSED" << std::endl;
                 server->instance_running[instance_id] = false;
                 break;
         }
@@ -133,65 +133,63 @@ void server_display_handler(const SocketServer* server, const uint8_t instance_i
     while(server->active && server->instance_running[instance_id]) {
         // Implement sm_display_comm_state
         switch(display_state) {
-            case SM_DISPLAY_WAITING_FOR_INTERVAL:
-                // Check if INTERVAL_DISPLAY has been reached
-                if(sem_time_to_display.try_acquire()) {
-                    std::cout << "DISPLAY HANDLER STATE: SM_DISPLAY_WAITING_FOR_INTERVAL" << std::endl;
-                    // Send LCD display text with current values
-                    std::string display_text = "";
+            case SM_DISPLAY_WAITING_FOR_INTERVAL: {
+                std::cout << "DISPLAY HANDLER: STATE SM_DISPLAY_WAITING_FOR_INTERVAL" << std::endl;
+                usleep(INTERVAL_DISPLAY);
+                // Send LCD display text with current values
+                std::string display_text = "";
 
-                    if((latest_readings.temp != std::numeric_limits<float>::max())
-                        && (latest_readings.rel_hum != std::numeric_limits<float>::max())) {
-                        // Fill display_text with values
-                        // 4 digits each
-                        std::stringstream stream;
-                        stream << std::fixed << std::setprecision(4) << latest_readings.temp;
-                        display_text += ("TEMP:    " + stream.str() + " F");
-                        stream << std::fixed << std::setprecision(4) << latest_readings.rel_hum;
-                        display_text += ("HUM:     " + stream.str() + " %");
-                    }
-                    else {
-                        // If the latest measurement was faulty, send the default text
-                        display_text = lcd_display_text_default;
-                    }
+                if((latest_readings.temp != std::numeric_limits<float>::max())
+                    && (latest_readings.rel_hum != std::numeric_limits<float>::max())) {
+                    // Fill display_text with values
+                    // 4 digits each
+                    std::stringstream stream;
+                    stream << std::fixed << std::setprecision(2) << latest_readings.temp;
+                    display_text += ("TEMP:    " + stream.str() + " F");
+                    stream.str(std::string());
+                    stream << std::fixed << std::setprecision(2) << latest_readings.rel_hum;
+                    display_text += ("HUM:     " + stream.str() + " %");
+                }
+                else {
+                    // If the latest measurement was faulty, send the default text
+                    display_text = lcd_display_text_default;
+                }
 
-                    server->instance_send_buffer_len[instance_id] = LCD_DISPLAY_TEXT_LEN;
-                    memcpy((void*)instance_send_buffer, display_text.c_str(), LCD_DISPLAY_TEXT_LEN);
-                    ssize_t send_size = send(socket, (void*)instance_send_buffer, server->instance_send_buffer_len[instance_id], 0);
+                server->instance_send_buffer_len[instance_id] = LCD_DISPLAY_TEXT_LEN;
+                memcpy((void*)instance_send_buffer, display_text.c_str(), LCD_DISPLAY_TEXT_LEN);
+                ssize_t send_size = send(socket, (void*)instance_send_buffer, server->instance_send_buffer_len[instance_id], 0);
 
-                    // Check send status
-                    if(send_size == server->instance_send_buffer_len[instance_id]) {
-                        // Send was successful
-                        display_state = SM_DISPLAY_PENDING_ACK;
-                    }
-                    else {
-                        // Send was not successful
-                        // Lost connection
-                        std::cout << "DISPLAY HANDLER CONNECTION CLOSED" << std::endl;
-                        server->instance_running[instance_id] = false;
-                        display_state = SM_DISPLAY_UNKNOWN_STATE;
-                    }
-
-                    sem_time_to_display.release();
+                // Check send status
+                if(send_size == server->instance_send_buffer_len[instance_id]) {
+                    // Send was successful
+                    display_state = SM_DISPLAY_PENDING_ACK;
+                }
+                else {
+                    // Send was not successful
+                    // Lost connection
+                    std::cout << "DISPLAY HANDLER: CONNECTION CLOSED" << std::endl;
+                    server->instance_running[instance_id] = false;
+                    display_state = SM_DISPLAY_UNKNOWN_STATE;
                 }
 
                 break;
+            }
 
             case SM_DISPLAY_PENDING_ACK:
-                std::cout << "DISPLAY HANDLER STATE: SM_DISPLAY_PENDING_ACK" << std::endl;
+                std::cout << "DISPLAY HANDLER: STATE SM_DISPLAY_PENDING_ACK" << std::endl;
                 // Wait for ACK from socket
                 server->instance_recv_buffer_len[instance_id] = ::read(socket, (void*)instance_recv_buffer, server->recv_buffer_max_len);
 
                 // Check read status
                 if((server->instance_recv_buffer_len[instance_id] == MSG_ACK_LEN)
-                    && (instance_recv_buffer[0]) == MSG_ACK) {
+                    && (instance_recv_buffer[0] == MSG_ACK_BYTE)) {
                     // Receive was successful
 
                     display_state = SM_DISPLAY_WAITING_FOR_INTERVAL;
                 }
                 else {
                     // Lost connection
-                    std::cout << "DISPLAY HANDLER CONNECTION CLOSED" << std::endl;
+                    std::cout << "DISPLAY HANDLER: CONNECTION CLOSED" << std::endl;
                     server->instance_running[instance_id] = false;
                     display_state = SM_DISPLAY_UNKNOWN_STATE;
                 }
@@ -200,7 +198,7 @@ void server_display_handler(const SocketServer* server, const uint8_t instance_i
 
             case SM_DISPLAY_UNKNOWN_STATE:
                 // This shouldn't be reachable, as SM_SENSOR_UNKNOWN_STATE means that there is no connection
-                std::cout << "DISPLAY HANDLER CONNECTION CLOSED" << std::endl;
+                std::cout << "DISPLAY HANDLER: CONNECTION CLOSED" << std::endl;
                 server->instance_running[instance_id] = false;
                 break;
         }
@@ -213,22 +211,6 @@ void server_sensor_run_instance(SocketServer* server) {
 
 void server_display_run_instance(SocketServer* server) {
     server->skt__run_instances();
-}
-
-void server_sensor_interval() {
-    while(1) {
-        sem_time_to_measure.acquire();
-        usleep(INTERVAL_MEASUREMENT);
-        sem_time_to_measure.release();
-    }
-}
-
-void server_display_interval() {
-    while(1) {
-        sem_time_to_display.acquire();
-        usleep(INTERVAL_DISPLAY);
-        sem_time_to_display.release();
-    } 
 }
 
 int main(int argc, char** argv) {
@@ -273,30 +255,14 @@ int main(int argc, char** argv) {
         server_sensor.skt__set_active(true);
         server_display.skt__set_active(true);
 
-        // Init semaphores
-        sem_time_to_measure.release();
-        sem_time_to_display.release();
-
-        // Run interval checkers
-        std::thread th_server_sensor_interval(server_sensor_interval);
-        std::thread th_server_display_interval(server_display_interval);
-
         // Run servers
         std::thread server_sensor_instance(server_sensor_run_instance, &server_sensor);
-//        std::thread server_display_instance(server_display_run_instance, &server_display);
+        std::thread server_display_instance(server_display_run_instance, &server_display);
 
         server_sensor_instance.join();
-//        server_display_instance.join();
-
-        th_server_sensor_interval.join();
-//        th_server_display_interval.join();
+        server_display_instance.join();
     }
 
     std::cout << "STOPPING WEATHER SERVER" << std::endl;
     return 0;
 }
-
-/*
-    Need one thread for server_sensor and call server_sensor.skt__run_instances()
-    Need another thread for server_display and call server_display.skt__run_instances();
-*/

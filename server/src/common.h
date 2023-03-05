@@ -34,6 +34,7 @@ const char LCD_DISPLAY_TEXT_LEN = lcd_display_text_default.length() + 1;
 const char MSG_MEAS_REQ = 0xB1;
 const char MSG_MEAS_REQ_LEN = sizeof(MSG_MEAS_REQ);
 
+const char MSG_ACK_BYTE = 0xA2;
 const char MSG_ACK_LEN = sizeof(char);
 
 #endif  // COMMON_
