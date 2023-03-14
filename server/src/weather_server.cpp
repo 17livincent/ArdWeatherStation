@@ -155,6 +155,8 @@ void server_display_handler(const SocketServer* server, const uint8_t instance_i
                     display_text = lcd_display_text_default;
                 }
 
+                std::cout << "DISPLAY HANDLER: Sending \"" << display_text << "\"" << std::endl;
+
                 server->instance_send_buffer_len[instance_id] = LCD_DISPLAY_TEXT_LEN;
                 memcpy((void*)instance_send_buffer, display_text.c_str(), LCD_DISPLAY_TEXT_LEN);
                 ssize_t send_size = send(socket, (void*)instance_send_buffer, server->instance_send_buffer_len[instance_id], 0);
@@ -254,6 +256,10 @@ int main(int argc, char** argv) {
 
         server_sensor.skt__set_active(true);
         server_display.skt__set_active(true);
+
+        // Set initial values of temp and hum, representing no measurement yet
+        latest_readings.temp = std::numeric_limits<float>::max();
+        latest_readings.rel_hum = std::numeric_limits<float>::max();
 
         // Run servers
         std::thread server_sensor_instance(server_sensor_run_instance, &server_sensor);
