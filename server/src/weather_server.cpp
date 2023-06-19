@@ -145,7 +145,13 @@ void server_display_handler(const SocketServer* server, const uint8_t instance_i
                     // 4 digits each
                     std::stringstream stream;
                     stream << std::fixed << std::setprecision(2) << latest_readings.temp;
-                    display_text += ("TEMP:    " + stream.str() + " F");
+                    if(latest_readings.temp >= 100) {
+                        display_text += ("TEMP:   ");
+                    }
+                    else {
+                        display_text += ("TEMP:    ");
+                    }
+                    display_text += (stream.str() + " F");
                     stream.str(std::string());
                     stream << std::fixed << std::setprecision(2) << latest_readings.rel_hum;
                     display_text += ("HUM:     " + stream.str() + " %");
